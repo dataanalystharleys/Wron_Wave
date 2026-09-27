@@ -13,45 +13,45 @@ import MobileStickyBar from './components/MobileStickyBar';
 import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
 import AdminPortal from './components/AdminPortal';
+import AuthModal from './components/AuthModal';
 import Footer from './components/Footer';
 import { INITIAL_PRODUCTS, BRAND_INFO } from './data/mockProducts';
 import { ShoppingBag, Sparkles, Filter, Ruler, Package } from 'lucide-react';
+import { useCart } from './context/CartContext';
+import { useAuth } from './context/AuthContext';
 
 export default function App() {
   const [products, setProducts] = useState(INITIAL_PRODUCTS);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   
-  // Cart state
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('wron_wave_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  // Auth state via AuthContext
+  const { isAuthenticated, openAuthModal } = useAuth();
+
+  // Cart state via CartContext
+  const {
+    cart,
+    cartCount,
+    isCartOpen,
+    setIsCartOpen,
+    openCart,
+    closeCart,
+    addToCart,
+    updateQuantity,
+    removeFromCart,
+    clearCart,
+    appliedCoupon,
+    setAppliedCoupon
+  } = useCart();
 
   // Modal states
-  const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [quickViewProduct, setQuickViewProduct] = useState(null);
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [sizeGuideCategory, setSizeGuideCategory] = useState('printed-tees');
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
   const [channelOrderData, setChannelOrderData] = useState(null);
-  
-  const [appliedCoupon, setAppliedCoupon] = useState('WAVE50'); // default to 50% launch discount!
   const [isAdmin, setIsAdmin] = useState(false);
-
-  // Sync cart to local storage
-  useEffect(() => {
-    try {
-      localStorage.setItem('wron_wave_cart', JSON.stringify(cart));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [cart]);
 
   // Try fetching products from live backend API if running
   useEffect(() => {
@@ -69,65 +69,58 @@ export default function App() {
     fetchApiProducts();
   }, []);
 
-  // Cart operations
+  // Cart operations delegate to CartContext
   const handleAddToCart = (product, size) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id && item.size === size);
-      if (existing) {
-        return prev.map((item) =>
-          item.id === product.id && item.size === size
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prev, { ...product, size, quantity: 1 }];
-    });
+    addToCart(product, size, { openDrawer: true });
   };
 
   const handleUpdateQuantity = (productId, size, newQty) => {
-    if (newQty <= 0) {
-      handleRemoveItem(productId, size);
-      return;
-    }
-    setCart((prev) =>
-      prev.map((item) =>
-        item.id === productId && item.size === size ? { ...item, quantity: newQty } : item
-      )
-    );
+    updateQuantity(productId, size, newQty);
   };
 
   const handleRemoveItem = (productId, size) => {
-    setCart((prev) => prev.filter((item) => !(item.id === productId && item.size === size)));
+    removeFromCart(productId, size);
   };
 
-  // Quick single-item WhatsApp Order
-  const handleQuickWhatsApp = (product, size) => {
-    const discounted = Math.round(product.price * 0.5);
-    const message = `*Order Enquiry - WRON_WAVE CLOTHING*\n` +
-      `Product: *${product.name}*\n` +
-      `Category: ${product.categoryLabel}\n` +
-      `Size: *${size}*\n` +
-      `Fabric: ${product.fabricType || 'Premium Cotton'}\n` +
-      `Offer Price (50% OFF): *₹${discounted}* (Regular ₹${product.price})\n\n` +
-      `I would like to order this with Hyderabad door delivery!`;
-
-    const url = `https://wa.me/${BRAND_INFO.whatsappNumber}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
+  // URL hash routing: Navigating to /#admin directly opens Admin Portal
+  useEffect(() => {
+    const handleHash = () => {
+      if (window.location.hash === '#admin') {
+        setIsAdmin(true);
+      }
+    };
+    handleHash();
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   const handleOpenSizeGuide = (cat = 'printed-tees') => {
     setSizeGuideCategory(cat);
     setIsSizeGuideOpen(true);
   };
 
-  // Direct E-Commerce Buy Now: adds item to cart and immediately opens checkout
+  // Direct E-Commerce Buy Now: adds item to cart, enforces authentication, then opens checkout
   const handleBuyNow = (product, size) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id && item.size === size);
-      if (existing) return prev;
-      return [...prev, { ...product, size, quantity: 1 }];
-    });
-    setIsCheckoutOpen(true);
+    addToCart(product, size, { openDrawer: false });
+    if (!isAuthenticated) {
+      openAuthModal('signin', () => {
+        setIsCheckoutOpen(true);
+      });
+    } else {
+      setIsCheckoutOpen(true);
+    }
+  };
+
+  // Enforce authentication before proceeding to checkout from cart
+  const handleProceedToCheckout = () => {
+    setIsCartOpen(false);
+    if (!isAuthenticated) {
+      openAuthModal('signin', () => {
+        setIsCheckoutOpen(true);
+      });
+    } else {
+      setIsCheckoutOpen(true);
+    }
   };
 
   const handleOrderSuccess = (newOrder) => {
@@ -137,7 +130,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    setCart([]);
+    clearCart();
   };
 
   // Filter products by category and search
@@ -153,7 +146,7 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
-  const cartTotalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const cartTotalItems = cartCount;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white flex flex-col selection:bg-white selection:text-black">
@@ -296,10 +289,7 @@ export default function App() {
         cartItems={cart}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveItem}
-        onProceedToCheckout={() => {
-          setIsCartOpen(false);
-          setIsCheckoutOpen(true);
-        }}
+        onProceedToCheckout={handleProceedToCheckout}
         appliedCoupon={appliedCoupon}
         setAppliedCoupon={setAppliedCoupon}
       />
@@ -343,6 +333,9 @@ export default function App() {
         isOpen={isTrackerOpen}
         onClose={() => setIsTrackerOpen(false)}
       />
+
+      {/* Free User Authentication Modal (Google OAuth & Email/Password) */}
+      <AuthModal />
 
       {/* Sticky Mobile Bottom Bar */}
       {!isAdmin && (

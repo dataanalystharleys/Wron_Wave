@@ -15,39 +15,6 @@ const LOCAL_STORAGE_PRODUCTS_KEY = 'wron_wave_custom_products';
 const SUPABASE_URL = import.meta.env?.VITE_SUPABASE_URL || '';
 const SUPABASE_KEY = import.meta.env?.VITE_SUPABASE_ANON_KEY || '';
 const GOOGLE_SHEETS_WEBHOOK = import.meta.env?.VITE_GOOGLE_SHEETS_WEBHOOK_URL || '';
-export const ADMIN_WHATSAPP_NUMBER = '919187000720'; // Official Store Admin Number
-
-/**
- * Generates formatted WhatsApp Order Alert message for Administrator (9187000720)
- */
-export function formatAdminWhatsAppMessage(order) {
-  const itemsText = (order.items || []).map((it, idx) => 
-    `${idx + 1}. *${it.name}*\n   Size: ${it.size} | Qty: ${it.quantity} | ₹${it.price * it.quantity}`
-  ).join('\n');
-
-  return `🚨 *NEW CUSTOMER ORDER RECEIVED - WRON_WAVE STORE*\n` +
-    `-----------------------------------------\n` +
-    `📦 *Order ID*: #${order.id}\n` +
-    `👤 *Customer*: ${order.customer?.name || 'Customer'}\n` +
-    `📱 *Phone*: ${order.customer?.phone || 'N/A'}\n` +
-    `📍 *Delivery Address*:\n${order.customer?.address || 'Hyderabad'}\n` +
-    `-----------------------------------------\n` +
-    `🏷️ *ITEMS ORDERED*:\n${itemsText}\n` +
-    `-----------------------------------------\n` +
-    `💵 *Payment Mode*: ${order.paymentMethod || 'Cash on Delivery (COD)'}\n` +
-    `💰 *Total Amount to Collect*: *₹${order.total}*\n` +
-    `🚚 *Fulfillment*: Hyderabad Doorstep Delivery (1-2 Days)\n` +
-    `⏰ *Order Placed*: ${new Date(order.createdAt || Date.now()).toLocaleString('en-IN')}\n\n` +
-    `*Action*: Customer has confirmed order on website. Please prepare parcel for dispatch!`;
-}
-
-/**
- * Returns WhatsApp Deep-Link to trigger alert to Admin Number 9187000720
- */
-export function getAdminWhatsAppUrl(order) {
-  const msg = formatAdminWhatsAppMessage(order);
-  return `https://wa.me/${ADMIN_WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-}
 
 /**
  * Saves a new customer order to:
@@ -122,6 +89,29 @@ export async function saveOrderToDatabase(newOrder) {
       console.log('Order row synced to Google Sheets');
     } catch (err) {
       console.warn('Google Sheets sync skipped/failed:', err);
+    }
+  }
+
+  // 4. Trigger Free WhatsApp Order Alert via CallMeBot (/api/send-order-alert)
+  try {
+    const alertRes = await fetch('/api/send-order-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: newOrder })
+    });
+    const alertData = await alertRes.json();
+    console.log('[CallMeBot WhatsApp Order Alert Status]:', alertData);
+  } catch (err) {
+    try {
+      const fallbackRes = await fetch('http://localhost:5000/api/send-order-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: newOrder })
+      });
+      const fallbackData = await fallbackRes.json();
+      console.log('[CallMeBot WhatsApp Order Alert Local Fallback]:', fallbackData);
+    } catch {
+      // ignore
     }
   }
 

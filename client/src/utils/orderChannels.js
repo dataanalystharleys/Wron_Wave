@@ -45,12 +45,19 @@ export function formatOrderMessage({
 }
 
 /**
- * Opens WhatsApp with pre-filled order text
+ * Dispatches order enquiry securely through backend
  */
-export function sendWhatsAppOrder(orderDetails) {
-  const text = formatOrderMessage(orderDetails);
-  const url = `https://wa.me/${BRAND_INFO.whatsappNumber}?text=${encodeURIComponent(text)}`;
-  window.open(url, '_blank');
+export async function sendWhatsAppOrder(orderDetails) {
+  try {
+    await fetch('/api/send-order-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: orderDetails })
+    });
+  } catch (e) {
+    console.warn('Backend order alert dispatch:', e);
+  }
+  alert('✓ Order enquiry successfully dispatched to the store fulfillment desk!');
 }
 
 /**

@@ -2,6 +2,7 @@ import React from 'react';
 import { Phone, MapPin, ShieldCheck, Sparkles, Heart } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 import InstagramIcon from './InstagramIcon';
+import TelegramIcon from './TelegramIcon';
 import { BRAND_INFO } from '../data/mockProducts';
 
 export default function Footer({ onSelectCategory }) {
@@ -27,13 +28,13 @@ export default function Footer({ onSelectCategory }) {
                 <InstagramIcon className="w-4 h-4 text-pink-400" />
               </a>
               <a
-                href={`https://wa.me/${BRAND_INFO.whatsappNumber}?text=${encodeURIComponent('Hi WRON_WAVE! I have an inquiry.')}`}
+                href={BRAND_INFO.telegramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-300 hover:text-white hover:border-zinc-600 transition"
-                title="WhatsApp"
+                title="Telegram"
               >
-                <Phone className="w-4 h-4 text-emerald-400" />
+                <TelegramIcon className="w-4 h-4 text-sky-400" />
               </a>
             </div>
           </div>
@@ -83,12 +84,12 @@ export default function Footer({ onSelectCategory }) {
                 <span>Door Delivery in Hyderabad Areas</span>
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="font-mono">7675833094</span>
+                <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
+                <span>DM @wron_wave on Instagram</span>
               </li>
               <li className="flex items-center gap-2">
-                <InstagramIcon className="w-3.5 h-3.5 text-pink-400" />
-                <span>DM @wron_wave</span>
+                <TelegramIcon className="w-3.5 h-3.5 text-sky-400" />
+                <span>Telegram: @wron_wave</span>
               </li>
               <li className="flex items-center gap-2">
                 <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
@@ -116,9 +117,11 @@ export default function Footer({ onSelectCategory }) {
         {/* Bottom bar */}
         <div className="pt-6 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-zinc-500">
           <p>© {new Date().getFullYear()} WRON_WAVE CLOTHING. All rights reserved.</p>
-          <p className="flex items-center gap-1">
-            Built for Streetwear Culture <Heart className="w-3 h-3 text-red-500 inline" />
-          </p>
+          <div className="flex items-center gap-4">
+            <p className="flex items-center gap-1">
+              Built for Streetwear Culture <Heart className="w-3 h-3 text-red-500 inline" />
+            </p>
+          </div>
         </div>
       </div>
     </footer>

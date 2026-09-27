@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ShoppingBag, Check, Eye, Ruler, Flame, Zap, ArrowRight } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 export default function ProductCard({ 
   product, 
@@ -8,6 +9,7 @@ export default function ProductCard({
   onOpenQuickView, 
   onOpenSizeGuide 
 }) {
+  const { addToCart } = useCart();
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'M');
   const [addedAnimation, setAddedAnimation] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
@@ -19,7 +21,11 @@ export default function ProductCard({
   const currentImage = (isHovered && images.length > 1) ? images[1] : images[0];
 
   const handleAdd = () => {
-    onAddToCart(product, selectedSize);
+    if (onAddToCart) {
+      onAddToCart(product, selectedSize);
+    } else {
+      addToCart(product, selectedSize, { openDrawer: true });
+    }
     setAddedAnimation(true);
     setTimeout(() => setAddedAnimation(false), 1200);
   };
@@ -28,7 +34,7 @@ export default function ProductCard({
     if (onBuyNow) {
       onBuyNow(product, selectedSize);
     } else {
-      onAddToCart(product, selectedSize);
+      addToCart(product, selectedSize, { openDrawer: false });
     }
   };
 

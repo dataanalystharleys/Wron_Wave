@@ -54,14 +54,14 @@ export default function Hero({ onExploreClick, onApplyCoupon }) {
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <a
-                  href={`https://wa.me/${BRAND_INFO.whatsappNumber}?text=${encodeURIComponent('Hi WRON_WAVE! I would like to order clothing with Hyderabad delivery.')}`}
+                  href={BRAND_INFO.telegramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 sm:flex-initial px-4 py-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-950/60"
-                  title="Chat on WhatsApp"
+                  className="flex-1 sm:flex-initial px-4 py-3.5 bg-sky-950 hover:bg-sky-900 border border-sky-800 text-sky-400 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-md"
+                  title="Join Telegram Drops"
                 >
-                  <MessageCircle className="w-4 h-4" />
-                  <span>WhatsApp</span>
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Join Drops</span>
                 </a>
 
                 <a
@@ -161,10 +161,10 @@ export default function Hero({ onExploreClick, onApplyCoupon }) {
                 </button>
               </div>
 
-              {/* Contact direct footer */}
+              {/* Hyderabad Express Badge */}
               <div className="mt-3 pt-3 border-t border-zinc-900 flex items-center justify-between text-xs text-zinc-400 font-mono">
-                <span>Direct Orders & Enquiries:</span>
-                <span className="text-white font-bold tracking-wider">7675833094</span>
+                <span>Doorstep Delivery:</span>
+                <span className="text-emerald-400 font-bold tracking-wider">Hyderabad 24–48h</span>
               </div>
 
             </div>

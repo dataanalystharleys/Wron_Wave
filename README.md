@@ -60,8 +60,8 @@ You can host this website completely free of cost with high performance and free
   3. Vintage Classic Formal Shirts
   4. Baggy Jeans with 90s Style
   5. Trendy Gen-Z Styles & Youth Outfits
-- **Dual Checkout Options**:
-  - **Instant WhatsApp Checkout**: Auto-formats selected items, sizes, quantities, and delivery address directly to `+91 7675833094`.
+- **Seamless Checkout & Automated Order Alerts**:
+  - **Automated WhatsApp Order Alerts**: Customer orders trigger instant background notifications to the admin via CallMeBot backend API (admin number is kept private and never exposed to customers).
   - **Web Checkout**: Standard checkout supporting Cash on Delivery (COD) and UPI QR payment.
 - **First 10 Customers 50% OFF**: Automatic promotional discount with coupon code `WAVE50`.
 - **Admin Control Panel**: Toggle the **Admin** button in the top navigation bar to view real-time incoming orders, customer phone numbers, addresses, and add new products to the catalog.

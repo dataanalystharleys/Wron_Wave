@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Check, ShoppingBag, Ruler, Truck, ShieldCheck, Zap, Sparkles, ChevronRight } from 'lucide-react';
 import { BRAND_INFO } from '../data/mockProducts';
+import { useCart } from '../context/CartContext';
 
 export default function ProductDetailModal({ 
   product, 
@@ -12,6 +13,7 @@ export default function ProductDetailModal({
 }) {
   if (!isOpen || !product) return null;
 
+  const { addToCart } = useCart();
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || 'M');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState('specs'); // 'specs' or 'care'
@@ -24,7 +26,11 @@ export default function ProductDetailModal({
   const discountedPrice = Math.round(product.price * 0.5);
 
   const handleAdd = () => {
-    onAddToCart(product, selectedSize);
+    if (onAddToCart) {
+      onAddToCart(product, selectedSize);
+    } else {
+      addToCart(product, selectedSize, { openDrawer: true });
+    }
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 1500);
   };
@@ -33,7 +39,7 @@ export default function ProductDetailModal({
     if (onBuyNow) {
       onBuyNow(product, selectedSize);
     } else {
-      onAddToCart(product, selectedSize);
+      addToCart(product, selectedSize, { openDrawer: false });
     }
     onClose();
   };

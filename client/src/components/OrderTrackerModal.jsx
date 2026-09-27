@@ -161,7 +161,7 @@ export default function OrderTrackerModal({ isOpen, onClose }) {
             <div className="text-center py-6 text-zinc-500 text-xs space-y-2">
               <Clock className="w-8 h-8 mx-auto stroke-1 text-zinc-600" />
               <p className="text-zinc-300 font-semibold">No order found for "{query}"</p>
-              <p>Check the phone number entered or message us directly on WhatsApp at <span className="text-emerald-400 font-mono">7675833094</span>.</p>
+              <p>Please check the mobile number entered or DM our Instagram <span className="text-amber-400 font-mono">@wron_wave</span> for live rider updates.</p>
             </div>
           ) : null}
         </div>

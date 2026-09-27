@@ -1,27 +1,40 @@
 import React, { useState } from 'react';
-import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Tag, Truck, ShieldCheck, Check } from 'lucide-react';
-import { BRAND_INFO } from '../data/mockProducts';
+import { X, Trash2, Plus, Minus, ShoppingBag, ArrowRight, Truck, ShieldCheck, Check } from 'lucide-react';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function CartDrawer({
-  isOpen,
-  onClose,
-  cartItems,
-  onUpdateQuantity,
-  onRemoveItem,
-  onProceedToCheckout,
-  appliedCoupon,
-  setAppliedCoupon
+  isOpen: propIsOpen,
+  onClose: propOnClose,
+  cartItems: propCartItems,
+  onUpdateQuantity: propOnUpdateQuantity,
+  onRemoveItem: propOnRemoveItem,
+  onProceedToCheckout: propOnProceedToCheckout,
+  appliedCoupon: propAppliedCoupon,
+  setAppliedCoupon: propSetAppliedCoupon
 }) {
+  const cartContext = useCart();
+  const { isAuthenticated } = useAuth();
+
+  const isOpen = propIsOpen !== undefined ? propIsOpen : cartContext.isCartOpen;
+  const onClose = propOnClose || cartContext.closeCart;
+  const cartItems = propCartItems !== undefined ? propCartItems : cartContext.cart;
+  const onUpdateQuantity = propOnUpdateQuantity || cartContext.updateQuantity;
+  const onRemoveItem = propOnRemoveItem || cartContext.removeFromCart;
+  const appliedCoupon = propAppliedCoupon !== undefined ? propAppliedCoupon : cartContext.appliedCoupon;
+  const setAppliedCoupon = propSetAppliedCoupon || cartContext.setAppliedCoupon;
+
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState('');
 
   if (!isOpen) return null;
 
   // Calculations
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const subtotal = cartItems.reduce((acc, item) => acc + (Number(item.price) || 0) * (item.quantity || 1), 0);
   const isDiscounted = appliedCoupon === 'WAVE50' || !appliedCoupon;
   const discountAmount = isDiscounted ? Math.round(subtotal * 0.5) : 0;
   const finalTotal = subtotal - discountAmount;
+  const totalItemsCount = cartItems.reduce((acc, i) => acc + (i.quantity || 1), 0);
 
   const handleApplyCoupon = (e) => {
     e.preventDefault();
@@ -31,6 +44,14 @@ export default function CartDrawer({
       setCouponError('');
     } else {
       setCouponError('Invalid coupon. Use WAVE50 for 50% off');
+    }
+  };
+
+  const handleCheckoutClick = () => {
+    if (propOnProceedToCheckout) {
+      propOnProceedToCheckout();
+    } else {
+      onClose();
     }
   };
 
@@ -46,7 +67,7 @@ export default function CartDrawer({
             <div className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5 text-white" />
               <h2 className="text-base sm:text-lg font-bold uppercase tracking-wider font-mono">
-                Your Bag ({cartItems.reduce((acc, i) => acc + i.quantity, 0)})
+                Your Bag ({totalItemsCount})
               </h2>
             </div>
             <button
@@ -77,13 +98,13 @@ export default function CartDrawer({
             ) : (
               cartItems.map((item) => (
                 <div
-                  key={`${item.id}-${item.size}`}
+                  key={`${item.id}-${item.size || 'M'}`}
                   className="flex gap-4 p-3.5 bg-zinc-900/60 border border-zinc-800/80 rounded-2xl relative group"
                 >
                   {/* Thumbnail */}
                   <div className="w-20 h-24 bg-zinc-950 rounded-xl overflow-hidden flex-shrink-0 border border-zinc-800">
                     <img
-                      src={(item.images && item.images[0]) || item.image}
+                      src={(item.images && item.images[0]) || item.image || 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=800&q=80'}
                       alt={item.name}
                       className="w-full h-full object-cover object-center"
                     />
@@ -107,7 +128,7 @@ export default function CartDrawer({
 
                       <div className="flex items-center gap-2 mt-1 text-[11px] text-zinc-400 font-mono">
                         <span className="bg-zinc-800 px-2 py-0.5 rounded text-white font-bold">
-                          Size: {item.size}
+                          Size: {item.size || 'M'}
                         </span>
                         {item.fabricType && (
                           <span className="truncate max-w-[120px] text-zinc-500">
@@ -118,19 +139,19 @@ export default function CartDrawer({
                     </div>
 
                     {/* Qty & Price */}
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-850">
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800">
                       <div className="flex items-center gap-2 border border-zinc-800 rounded-lg p-0.5 bg-zinc-950">
                         <button
-                          onClick={() => onUpdateQuantity(item.id, item.size, item.quantity - 1)}
+                          onClick={() => onUpdateQuantity(item.id, item.size, (item.quantity || 1) - 1)}
                           className="w-6 h-6 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
                         >
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-xs font-mono font-bold w-4 text-center">
-                          {item.quantity}
+                          {item.quantity || 1}
                         </span>
                         <button
-                          onClick={() => onUpdateQuantity(item.id, item.size, item.quantity + 1)}
+                          onClick={() => onUpdateQuantity(item.id, item.size, (item.quantity || 1) + 1)}
                           className="w-6 h-6 flex items-center justify-center hover:bg-zinc-800 rounded text-zinc-400 hover:text-white"
                         >
                           <Plus className="w-3 h-3" />
@@ -139,7 +160,7 @@ export default function CartDrawer({
 
                       <div className="text-right">
                         <span className="text-xs font-mono font-bold text-white">
-                          ₹{item.price * item.quantity}
+                          ₹{(item.price || 0) * (item.quantity || 1)}
                         </span>
                       </div>
                     </div>
@@ -203,10 +224,10 @@ export default function CartDrawer({
               {/* Standard E-Commerce Checkout Button */}
               <button
                 type="button"
-                onClick={onProceedToCheckout}
+                onClick={handleCheckoutClick}
                 className="w-full py-3.5 px-4 bg-white hover:bg-zinc-200 text-black rounded-2xl font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition active:scale-98 shadow-xl mt-2"
               >
-                <span>Proceed to Checkout (Cash on Delivery)</span>
+                <span>{isAuthenticated ? 'Proceed to Checkout (Cash on Delivery)' : 'Sign In & Proceed to Checkout'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
 

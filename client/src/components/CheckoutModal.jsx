@@ -5,8 +5,10 @@ import {
   Check, Printer, ArrowRight, ShoppingBag, Sparkles, MessageCircle
 } from 'lucide-react';
 import { BRAND_INFO } from '../data/mockProducts';
-import { saveOrderToDatabase, getAdminWhatsAppUrl, ADMIN_WHATSAPP_NUMBER } from '../services/cloudDb';
+import { saveOrderToDatabase } from '../services/cloudDb';
 import { checkDeliverability, getDeliveryConfig } from '../data/deliveryZones';
+import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 
 export default function CheckoutModal({
   isOpen,
@@ -15,6 +17,10 @@ export default function CheckoutModal({
   appliedCoupon,
   onOrderSuccess
 }) {
+  const { user } = useAuth();
+  const { clearCart, cart: contextCart } = useCart();
+  const effectiveCart = (cartItems && cartItems.length > 0) ? cartItems : contextCart;
+
   // Structured Address State (Standard Indian E-Commerce Format)
   const [formData, setFormData] = useState({
     fullName: '',
@@ -29,6 +35,17 @@ export default function CheckoutModal({
     addressType: 'Home',
     paymentMethod: 'Cash on Delivery (COD)'
   });
+
+  // Pre-fill user profile if authenticated
+  useEffect(() => {
+    if (user && isOpen) {
+      setFormData(prev => ({
+        ...prev,
+        fullName: prev.fullName || user.name || '',
+        phone: prev.phone || (user.phone ? user.phone.replace(/\D/g, '').slice(-10) : '')
+      }));
+    }
+  }, [user, isOpen]);
 
   const [deliveryStatus, setDeliveryStatus] = useState({
     isDeliverable: true,
@@ -54,7 +71,7 @@ export default function CheckoutModal({
   if (!isOpen) return null;
 
   // Price Calculations
-  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const subtotal = effectiveCart.reduce((acc, item) => acc + (Number(item.price) || 0) * (item.quantity || 1), 0);
   const isDiscounted = appliedCoupon === 'WAVE50' || !appliedCoupon;
   const discountAmount = isDiscounted ? Math.round(subtotal * 0.5) : 0;
   const finalTotal = subtotal - discountAmount;
@@ -117,8 +134,11 @@ export default function CheckoutModal({
 
     const orderPayload = {
       id: `WW-ORD-${Date.now().toString().slice(-4)}`,
+      user_id: user?.id || 'guest',
+      userId: user?.id || 'guest',
       customer: {
         name: formData.fullName,
+        email: user?.email || '',
         phone: `+91 ${formData.phone}`,
         altPhone: formData.altPhone ? `+91 ${formData.altPhone}` : null,
         address: formattedAddress,
@@ -130,12 +150,12 @@ export default function CheckoutModal({
         pincode: formData.pincode,
         addressType: formData.addressType
       },
-      items: cartItems.map((item) => ({
+      items: effectiveCart.map((item) => ({
         id: item.id,
         name: item.name,
-        size: item.size,
-        price: item.price,
-        quantity: item.quantity,
+        size: item.size || 'M',
+        price: Number(item.price) || 0,
+        quantity: item.quantity || 1,
         fabricType: item.fabricType || '240 GSM Heavy Cotton',
         image: (item.images && item.images[0]) || item.image
       })),
@@ -151,7 +171,7 @@ export default function CheckoutModal({
     };
 
     try {
-      // Save order to LocalStorage, Cloud Database, and Google Sheets
+      // Save order to LocalStorage, Supabase Cloud Database, and Google Sheets
       await saveOrderToDatabase(orderPayload);
       
       // Also notify backend API server if running
@@ -166,12 +186,14 @@ export default function CheckoutModal({
       }
 
       setCompletedOrder(orderPayload);
+      clearCart();
       if (onOrderSuccess) {
         onOrderSuccess(orderPayload);
       }
     } catch (err) {
       console.warn('Order save error:', err);
       setCompletedOrder(orderPayload);
+      clearCart();
       if (onOrderSuccess) {
         onOrderSuccess(orderPayload);
       }
@@ -302,6 +324,7 @@ export default function CheckoutModal({
                 <strong className="text-zinc-200">Order Recorded:</strong> Our Hyderabad delivery rider will call your phone (<span className="text-white font-mono">{completedOrder.customer.phone}</span>) prior to arriving with your package.
               </p>
             </div>
+
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">

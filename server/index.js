@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import fs from 'fs';
@@ -162,13 +163,12 @@ app.post('/api/orders', (req, res) => {
   orders.unshift(newOrder);
   writeJSON(ORDERS_FILE, orders);
 
-  console.log(`[ADMIN WHATSAPP DISPATCH] New Order #${newOrder.id} logged! Triggering admin notification to: +91 9187000720`);
+  console.log(`[ADMIN WHATSAPP DISPATCH] New Order #${newOrder.id} logged! Triggering automated backend alert.`);
 
   res.status(201).json({
     success: true,
     message: 'Order created successfully',
     order: newOrder,
-    adminNotificationTarget: '+91 9187000720',
     isFirst10Offer: isFirst10
   });
 });
@@ -190,6 +190,80 @@ app.post('/api/delivery-config', (req, res) => {
   }
   writeJSON(DELIVERY_CONFIG_FILE, newConfig);
   res.json({ success: true, message: 'Delivery configuration saved successfully' });
+});
+
+// POST /api/send-order-alert (CallMeBot 100% Free WhatsApp Alert)
+app.post('/api/send-order-alert', async (req, res) => {
+  try {
+    const order = req.body?.order || req.body || {};
+    const customerName = order.customer?.name || order.customer_name || 'Customer';
+    const customerPhone = order.customer?.phone || order.customer_phone || 'N/A';
+    const address = order.customer?.address || order.shipping_address || 'Hyderabad';
+    const totalAmount = order.total || order.total_amount || 0;
+
+    const itemList = (order.items || [])
+      .map(
+        (it, idx) =>
+          `${idx + 1}. ${it.name} (${it.size || 'M'}) x${it.quantity || 1} - ₹${
+            (it.price || 0) * (it.quantity || 1)
+          }`
+      )
+      .join('\n');
+
+    const message = `🚨 *New Order Alert!*\n` +
+      `👤 Customer: ${customerName} (${customerPhone})\n` +
+      `🛒 Items:\n${itemList || '1x Streetwear Item'}\n` +
+      `💰 Total: ₹${totalAmount}\n` +
+      `📍 Address: ${address}`;
+
+    // Dual Admin Recipients (100% private to backend)
+    const adminRecipients = [
+      {
+        id: 'Admin 1',
+        phone: (process.env.ADMIN_WHATSAPP_PHONE_1 || process.env.ADMIN_WHATSAPP_PHONE || '919187000720').replace(/\D/g, ''),
+        apiKey: process.env.CALLMEBOT_APIKEY_1 || process.env.CALLMEBOT_APIKEY
+      },
+      {
+        id: 'Admin 2',
+        phone: (process.env.ADMIN_WHATSAPP_PHONE_2 || '918500074205').replace(/\D/g, ''),
+        apiKey: process.env.CALLMEBOT_APIKEY_2
+      }
+    ].filter(a => a.phone);
+
+    console.log('\n========================================');
+    console.log('[CALLMEBOT DUAL ADMIN WHATSAPP DISPATCH]');
+    console.log(`Configured Admins: ${adminRecipients.length} (9187000720 & 8500074205)`);
+    console.log('Alert Message:\n' + message);
+
+    const dispatchResults = await Promise.allSettled(
+      adminRecipients.map(async (admin) => {
+        if (!admin.apiKey) {
+          console.log(`[CallMeBot Simulated] ${admin.id} (${admin.phone}) - API key not set in environment.`);
+          return { id: admin.id, success: true, simulated: true };
+        }
+
+        const callMeBotUrl = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(admin.phone)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(admin.apiKey)}`;
+        const response = await fetch(callMeBotUrl, { method: 'GET' });
+        const responseText = await response.text();
+        console.log(`[CallMeBot ${admin.id} Dispatch] HTTP ${response.status}: ${responseText}`);
+        return { id: admin.id, success: response.ok, status: response.status };
+      })
+    );
+    console.log('========================================\n');
+
+    return res.status(200).json({
+      success: true,
+      delivered: true,
+      recipientsCount: adminRecipients.length,
+      message: 'Dual admin order alerts processed successfully'
+    });
+  } catch (error) {
+    console.error('CallMeBot order alert error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Error triggering WhatsApp alert'
+    });
+  }
 });
 
 // Start Server

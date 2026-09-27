@@ -9,9 +9,26 @@ import { BRAND_INFO } from '../data/mockProducts';
 import { getDeliveryConfig, saveDeliveryConfig } from '../data/deliveryZones';
 
 export default function AdminPortal({ onBackToStore, onProductAdded }) {
+  const [isUnlocked, setIsUnlocked] = useState(() => {
+    return sessionStorage.getItem('wron_admin_unlocked') === 'true';
+  });
+  const [passcode, setPasscode] = useState('');
+  const [passcodeError, setPasscodeError] = useState('');
+
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('orders'); // 'orders', 'delivery-zones', 'new-product'
+
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    if (passcode.trim().toUpperCase() === 'WRON2026' || passcode.trim().toUpperCase() === 'WRON99') {
+      sessionStorage.setItem('wron_admin_unlocked', 'true');
+      setIsUnlocked(true);
+      setPasscodeError('');
+    } else {
+      setPasscodeError('Invalid Admin Passcode. Access restricted to store staff.');
+    }
+  };
 
   // Delivery Configuration State
   const [deliveryConfig, setDeliveryConfig] = useState(() => getDeliveryConfig());
@@ -223,6 +240,59 @@ export default function AdminPortal({ onBackToStore, onProductAdded }) {
   };
 
   const totalRevenue = orders.reduce((sum, ord) => sum + (ord.total || 0), 0);
+
+  if (!isUnlocked) {
+    return (
+      <div className="min-h-[70vh] flex items-center justify-center p-4">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl text-center space-y-5">
+          <div className="w-14 h-14 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto text-amber-400">
+            <ShieldCheck className="w-7 h-7" />
+          </div>
+          <div>
+            <h3 className="text-xl font-black uppercase tracking-tight text-white">
+              Store Owner Access
+            </h3>
+            <p className="text-xs text-zinc-400 mt-1">
+              Restricted area. Please enter your store manager passcode to access order management.
+            </p>
+          </div>
+
+          {passcodeError && (
+            <div className="p-3 bg-red-950/80 border border-red-800 rounded-xl text-xs text-red-300 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{passcodeError}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleUnlock} className="space-y-3">
+            <input
+              type="password"
+              value={passcode}
+              onChange={(e) => setPasscode(e.target.value)}
+              placeholder="Enter Store Passcode"
+              required
+              autoFocus
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-center text-sm text-white placeholder-zinc-500 tracking-widest font-mono focus:outline-none focus:border-amber-400"
+            />
+            <button
+              type="submit"
+              className="w-full py-3 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition shadow-lg active:scale-98 font-mono"
+            >
+              Unlock Admin Portal
+            </button>
+          </form>
+
+          <button
+            type="button"
+            onClick={onBackToStore}
+            className="text-xs text-zinc-500 hover:text-zinc-300 font-mono transition"
+          >
+            ← Return to Storefront
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

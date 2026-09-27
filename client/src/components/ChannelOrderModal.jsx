@@ -139,7 +139,7 @@ export default function ChannelOrderModal({
                   </span>
                 </div>
                 <div className="text-[11px] text-zinc-400 font-normal">
-                  Pre-fills all drops & delivery details to +91 {BRAND_INFO.whatsappNumber}
+                  Instant automated order dispatch
                 </div>
               </div>
             </div>
