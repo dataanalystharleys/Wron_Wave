@@ -92,6 +92,8 @@ export default async function handler(req, res) {
             email: cleanEmail,
             message: `Verification code delivered to ${cleanEmail}`
           });
+        } else {
+          console.warn('[Resend API Warning]:', resendData);
         }
       } catch (e) {
         console.error('Resend delivery error:', e);

@@ -267,22 +267,59 @@ app.post('/api/send-order-alert', async (req, res) => {
 });
 
 // Endpoint: Send 6-Digit Email Verification Code (OTP)
-app.post('/api/send-verification-email', (req, res) => {
+app.post('/api/send-verification-email', async (req, res) => {
   const { email, code, name } = req.body || {};
   if (!email || !code) {
     return res.status(400).json({ success: false, message: 'Missing email or verification code' });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
   console.log('\n========================================');
-  console.log(`[EMAIL OTP DISPATCH] Recipient: ${email} (${name || 'Customer'})`);
+  console.log(`[EMAIL OTP DISPATCH] Recipient: ${cleanEmail} (${name || 'Customer'})`);
   console.log(`[EMAIL OTP DISPATCH] 6-Digit Unique Code: ${code}`);
+
+  const resendApiKey = process.env.RESEND_API_KEY;
+  let dispatched = false;
+  if (resendApiKey) {
+    try {
+      const emailHtml = `
+        <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; background-color: #09090b; color: #ffffff; border: 1px solid #27272a; border-radius: 16px; overflow: hidden; padding: 24px;">
+          <h2 style="color: #ffffff; text-align: center;">WRON_WAVE CLOTHING</h2>
+          <p style="color: #a1a1aa; text-align: center;">Hi ${name || 'Customer'}, here is your 6-digit verification code:</p>
+          <div style="background-color: #18181b; border: 1px solid #3f3f46; border-radius: 12px; padding: 16px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #fbbf24; font-family: monospace;">${code}</span>
+          </div>
+          <p style="color: #71717a; text-align: center; font-size: 11px;">Valid for 10 minutes. Do not share this code.</p>
+        </div>
+      `;
+
+      const response = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${resendApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: 'WRON_WAVE <onboarding@resend.dev>',
+          to: [cleanEmail],
+          subject: `Your WRON_WAVE Verification Code: ${code}`,
+          html: emailHtml
+        })
+      });
+      const data = await response.json();
+      console.log(`[Resend Live Dispatch Result]:`, data);
+      dispatched = response.ok;
+    } catch (err) {
+      console.error('[Resend Error]:', err.message);
+    }
+  }
   console.log('========================================\n');
 
   return res.json({
     success: true,
-    delivered: true,
-    email,
-    message: `6-digit verification code successfully sent to ${email}`
+    delivered: dispatched,
+    email: cleanEmail,
+    message: `6-digit verification code processed for ${cleanEmail}`
   });
 });
 
