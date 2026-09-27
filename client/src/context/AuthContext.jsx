@@ -6,9 +6,11 @@ import {
   setLocalSession,
   signInWithGoogle as apiSignInWithGoogle,
   signInWithEmail as apiSignInWithEmail,
-  signUpWithEmail as apiSignUpWithEmail,
-  signOut as apiSignOut,
-  resetPasswordForEmail as apiResetPasswordForEmail
+  requestSignupVerification as apiRequestSignupVerification,
+  verifySignupCode as apiVerifySignupCode,
+  requestPasswordResetCode as apiRequestPasswordResetCode,
+  verifyPasswordResetWithCode as apiVerifyPasswordResetWithCode,
+  signOut as apiSignOut
 } from '../services/supabase';
 
 const AuthContext = createContext(null);
@@ -143,10 +145,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const registerWithEmail = async (email, password, meta = {}) => {
+  const requestSignupVerification = async ({ email, password, name, phone }) => {
     setLoading(true);
     try {
-      const result = await apiSignUpWithEmail(email, password, meta);
+      return await apiRequestSignupVerification({ email, password, name, phone });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifySignupCode = async ({ email, code }) => {
+    setLoading(true);
+    try {
+      const result = await apiVerifySignupCode({ email, code });
       if (result?.user) {
         setUser(result.user);
         setSession(result.session);
@@ -158,10 +169,19 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const resetPassword = async (email) => {
+  const requestPasswordReset = async (email) => {
     setLoading(true);
     try {
-      return await apiResetPasswordForEmail(email);
+      return await apiRequestPasswordResetCode(email);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const verifyPasswordReset = async ({ email, code, newPassword }) => {
+    setLoading(true);
+    try {
+      return await apiVerifyPasswordResetWithCode({ email, code, newPassword });
     } finally {
       setLoading(false);
     }
@@ -192,8 +212,10 @@ export function AuthProvider({ children }) {
         closeAuthModal,
         loginWithGoogle,
         loginWithEmail,
-        registerWithEmail,
-        resetPassword,
+        requestSignupVerification,
+        verifySignupCode,
+        requestPasswordReset,
+        verifyPasswordReset,
         logout
       }}
     >

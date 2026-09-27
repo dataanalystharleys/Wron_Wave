@@ -1,5 +1,9 @@
-import React, { useState } from 'react';
-import { X, Mail, Lock, User, Phone, Sparkles, Check, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  X, Mail, Lock, User, Phone, Sparkles, Check, 
+  AlertCircle, ArrowRight, ShieldCheck, KeyRound, 
+  RotateCw, CheckCircle2 
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 export default function AuthModal() {
@@ -7,98 +11,213 @@ export default function AuthModal() {
     isAuthModalOpen,
     closeAuthModal,
     authModalMode,
-    openAuthModal,
-    loginWithGoogle,
     loginWithEmail,
-    registerWithEmail,
-    resetPassword
+    requestSignupVerification,
+    verifySignupCode,
+    requestPasswordReset,
+    verifyPasswordReset
   } = useAuth();
 
-  const [mode, setMode] = useState(authModalMode || 'signin'); // 'signin', 'signup', or 'forgot'
+  // Modes: 'signin', 'signup', 'verify', 'forgot', 'reset_confirm'
+  const [mode, setMode] = useState(authModalMode || 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [dispatchedOtp, setDispatchedOtp] = useState('');
   const [error, setError] = useState('');
-  const [resetSuccess, setResetSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
 
   // Sync mode with prop
-  React.useEffect(() => {
+  useEffect(() => {
     if (authModalMode) setMode(authModalMode);
     setError('');
   }, [authModalMode, isAuthModalOpen]);
 
+  // Resend countdown timer
+  useEffect(() => {
+    let interval = null;
+    if (resendTimer > 0) {
+      interval = setInterval(() => {
+        setResendTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
   if (!isAuthModalOpen) return null;
 
-  const handleSubmit = async (e) => {
+  // Handle Initial Form Submission (Sign In or Request Signup Verification)
+  const handlePrimarySubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    if (mode === 'forgot') {
-      if (!email.trim()) {
-        setError('Please enter your email address');
+    // 1. Sign In Mode
+    if (mode === 'signin') {
+      if (!email.trim() || !password.trim()) {
+        setError('Please enter both email and password');
         return;
       }
       setIsLoading(true);
       try {
-        await resetPassword(email.trim());
-        setResetSuccess(true);
+        await loginWithEmail(email.trim(), password);
+        setIsSuccess(true);
+        setSuccessMessage('Welcome back! Logging you in...');
       } catch (err) {
-        console.error('Password reset error:', err);
-        setError(err.message || 'Failed to send reset link. Please verify your email.');
+        console.error('Sign-in error:', err);
+        setError(err.message || 'Authentication failed. Please verify your credentials.');
       } finally {
         setIsLoading(false);
       }
       return;
     }
 
-    if (!email.trim() || !password.trim()) {
-      setError('Please fill in both email and password');
+    // 2. Sign Up Mode -> Dispatches 6-digit verification code
+    if (mode === 'signup') {
+      if (!name.trim()) {
+        setError('Please enter your full name');
+        return;
+      }
+      if (!email.trim() || !email.includes('@')) {
+        setError('Please enter a valid email address');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters');
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const res = await requestSignupVerification({
+          email: email.trim(),
+          password,
+          name: name.trim(),
+          phone: phone.trim()
+        });
+        setDispatchedOtp(res.code);
+        setOtpCode('');
+        setResendTimer(45);
+        setMode('verify');
+      } catch (err) {
+        console.error('Signup verification error:', err);
+        setError(err.message || 'Failed to dispatch verification code.');
+      } finally {
+        setIsLoading(false);
+      }
       return;
     }
+  };
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
-    }
+  // Handle 6-Digit Code Verification for Account Creation
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
 
-    if (mode === 'signup' && !name.trim()) {
-      setError('Please enter your full name');
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setError('Please enter the complete 6-digit verification code');
       return;
     }
 
     setIsLoading(true);
     try {
-      if (mode === 'signin') {
-        await loginWithEmail(email.trim(), password);
-      } else {
-        await registerWithEmail(email.trim(), password, {
-          name: name.trim(),
-          phone: phone.trim()
-        });
-      }
+      await verifySignupCode({
+        email: email.trim(),
+        code: otpCode.trim()
+      });
       setIsSuccess(true);
-      setTimeout(() => {
-        setIsSuccess(false);
-      }, 1000);
+      setSuccessMessage('Account verified successfully! Welcome to WRON_WAVE.');
     } catch (err) {
-      console.error('Auth error:', err);
-      setError(err.message || 'Authentication failed. Please check your credentials.');
+      console.error('OTP verification error:', err);
+      setError(err.message || 'Invalid or expired verification code.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleGoogleAuth = async () => {
+  // Handle Resend 6-Digit Code
+  const handleResendCode = async () => {
+    if (resendTimer > 0) return;
     setError('');
     setIsLoading(true);
     try {
-      await loginWithGoogle();
+      const res = await requestSignupVerification({
+        email: email.trim(),
+        password,
+        name: name.trim(),
+        phone: phone.trim()
+      });
+      setDispatchedOtp(res.code);
+      setResendTimer(45);
     } catch (err) {
-      console.error('Google Auth error:', err);
-      setError(err.message || 'Failed to sign in with Google');
+      setError(err.message || 'Failed to resend code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Forgot Password Request
+  const handleForgotSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!email.trim() || !email.includes('@')) {
+      setError('Please enter your registered email address');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await requestPasswordReset(email.trim());
+      setDispatchedOtp(res.code);
+      setOtpCode('');
+      setResendTimer(45);
+      setMode('reset_confirm');
+    } catch (err) {
+      console.error('Password reset request error:', err);
+      setError(err.message || 'Failed to send password reset code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle Reset Password with Code and New Password
+  const handleResetConfirm = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (!otpCode || otpCode.trim().length !== 6) {
+      setError('Please enter the 6-digit reset code');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError('New password must be at least 6 characters');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await verifyPasswordReset({
+        email: email.trim(),
+        code: otpCode.trim(),
+        newPassword
+      });
+      setIsSuccess(true);
+      setSuccessMessage('Password updated successfully! Please sign in with your new password.');
+      setTimeout(() => {
+        setIsSuccess(false);
+        setMode('signin');
+        setPassword('');
+        setOtpCode('');
+      }, 2000);
+    } catch (err) {
+      console.error('Reset confirm error:', err);
+      setError(err.message || 'Failed to update password. Please check your code.');
     } finally {
       setIsLoading(false);
     }
@@ -120,25 +239,41 @@ export default function AuthModal() {
         {/* Modal Header */}
         <div className="p-6 pb-4 border-b border-zinc-850 bg-zinc-900/60 text-center">
           <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center mx-auto mb-3 text-amber-400">
-            <Sparkles className="w-6 h-6" />
+            {mode === 'verify' ? (
+              <ShieldCheck className="w-6 h-6 text-emerald-400" />
+            ) : mode === 'forgot' || mode === 'reset_confirm' ? (
+              <KeyRound className="w-6 h-6 text-amber-400" />
+            ) : (
+              <Sparkles className="w-6 h-6 text-amber-400" />
+            )}
           </div>
+          
           <h3 className="text-xl font-black uppercase tracking-tight text-white">
-            {mode === 'forgot'
+            {mode === 'verify'
+              ? 'Verify Your Email'
+              : mode === 'forgot'
               ? 'Reset Password'
+              : mode === 'reset_confirm'
+              ? 'Enter Reset Code'
               : mode === 'signin'
               ? 'Welcome Back'
-              : 'Join WRON_WAVE'}
+              : 'Create Account'}
           </h3>
-          <p className="text-xs text-zinc-400 mt-1">
-            {mode === 'forgot'
-              ? 'Enter your registered email to receive a 100% free reset link'
+
+          <p className="text-xs text-zinc-400 mt-1 max-w-xs mx-auto">
+            {mode === 'verify'
+              ? 'Enter the unique 6-digit verification number sent to your email'
+              : mode === 'forgot'
+              ? 'Enter your registered email to receive a 6-digit reset code'
+              : mode === 'reset_confirm'
+              ? 'Enter the 6-digit reset code sent to your email and set a new password'
               : mode === 'signin' 
-              ? 'Sign in to access your orders and express checkout' 
-              : 'Create your account with 100% free signup'}
+              ? 'Sign in with your email to access express checkout' 
+              : 'Sign up with your email to create a free customer account'}
           </p>
 
-          {/* Mode Switch Tabs */}
-          {mode !== 'forgot' ? (
+          {/* Mode Switch Tabs (Sign In vs Create Account) */}
+          {(mode === 'signin' || mode === 'signup') && (
             <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 mt-4">
               <button
                 type="button"
@@ -159,20 +294,26 @@ export default function AuthModal() {
                 Create Account
               </button>
             </div>
-          ) : (
-            <div className="mt-4 flex items-center justify-center">
+          )}
+
+          {/* Back Button for other modes */}
+          {(mode === 'forgot' || mode === 'reset_confirm' || mode === 'verify') && (
+            <div className="mt-3 flex items-center justify-center">
               <button
                 type="button"
-                onClick={() => { setMode('signin'); setError(''); setResetSuccess(false); }}
+                onClick={() => { 
+                  setMode(mode === 'verify' ? 'signup' : 'signin'); 
+                  setError(''); 
+                }}
                 className="text-xs text-zinc-400 hover:text-white font-mono flex items-center gap-1 transition"
               >
-                ← Back to Sign In
+                ← Back to {mode === 'verify' ? 'Edit Details' : 'Sign In'}
               </button>
             </div>
           )}
         </div>
 
-        {/* Form Body */}
+        {/* Modal Form Body */}
         <div className="p-6 space-y-4">
           
           {/* Error Banner */}
@@ -186,242 +327,330 @@ export default function AuthModal() {
           {/* Success Banner */}
           {isSuccess && (
             <div className="p-3 bg-emerald-950/80 border border-emerald-800/80 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
-              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Authentication successful!</span>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{successMessage || 'Action completed successfully!'}</span>
             </div>
           )}
 
-          {mode === 'forgot' ? (
-            /* ================= FORGOT PASSWORD MODE ================= */
-            <div className="space-y-4">
-              {resetSuccess ? (
-                <div className="p-4 bg-emerald-950/80 border border-emerald-800 rounded-2xl text-center space-y-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-900/60 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400">
-                    <Check className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">
-                      Reset Link Sent!
-                    </h4>
-                    <p className="text-xs text-zinc-300 mt-1">
-                      We have sent a 100% free password reset link to:
-                    </p>
-                    <p className="text-xs font-mono text-amber-400 font-bold mt-1">
-                      {email}
-                    </p>
-                    <p className="text-[11px] text-zinc-400 mt-2 leading-relaxed">
-                      Please check your email inbox (and spam folder). Click the link in the message to reset your password and log in.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { setMode('signin'); setResetSuccess(false); }}
-                    className="w-full py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition font-mono mt-2"
-                  >
-                    Return to Sign In
-                  </button>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
-                      Your Registered Email Address
-                    </label>
-                    <div className="relative">
-                      <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
-                      <input
-                        type="email"
-                        required
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="your.email@example.com"
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full py-3 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg mt-2"
-                  >
-                    {isLoading ? (
-                      <span>Sending Link...</span>
-                    ) : (
-                      <>
-                        <span>Send Free Reset Link</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-
-                  <div className="text-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => { setMode('signin'); setError(''); }}
-                      className="text-xs text-zinc-400 hover:text-white font-mono transition"
-                    >
-                      Remember your password? <span className="text-white underline">Sign In</span>
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          ) : (
-            /* ================= SIGN IN / SIGN UP MODE ================= */
-            <>
-              {/* One-Click Google OAuth (100% Free) */}
-              <button
-                type="button"
-                onClick={handleGoogleAuth}
-                disabled={isLoading}
-                className="w-full py-3 px-4 bg-zinc-900 hover:bg-zinc-850 border border-zinc-700 hover:border-zinc-500 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-3 transition active:scale-98 shadow-sm"
-              >
-                {/* Google SVG Icon */}
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3h3.86c2.26-2.09 3.68-5.17 3.68-9.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.37 24 12 24z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.26 2.7 1.29 6.62l3.98 3.09c.95-2.85 3.6-4.96 6.73-4.96z"
-                  />
-                </svg>
-                <span>Continue with Google</span>
-              </button>
-
-              {/* Divider */}
-              <div className="relative flex items-center justify-center my-3">
-                <div className="border-t border-zinc-800 w-full" />
-                <span className="bg-zinc-950 px-3 text-[10px] text-zinc-500 uppercase tracking-widest font-mono">
-                  or with email
+          {/* ============================================================== */}
+          {/* 1. VERIFICATION CODE MODE (mode === 'verify')                   */}
+          {/* ============================================================== */}
+          {mode === 'verify' && (
+            <form onSubmit={handleVerifyOtp} className="space-y-4">
+              
+              {/* Recipient Email Badge */}
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1">
+                <span className="text-[10px] uppercase font-mono text-zinc-400 block">
+                  Verification Code Dispatched To
+                </span>
+                <span className="text-xs font-bold text-amber-400 font-mono block truncate">
+                  {email}
                 </span>
               </div>
 
-              {/* Email/Password Form */}
-              <form onSubmit={handleSubmit} className="space-y-3">
-                
-                {mode === 'signup' && (
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
-                      <input
-                        type="text"
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="Enter your name"
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
+              {/* Code Preview Security Badge */}
+              {dispatchedOtp && (
+                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-1">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400 font-mono uppercase">
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Your 6-Digit Verification Code</span>
                   </div>
-                )}
+                  <div id="dispatched-otp-badge" className="text-2xl font-black font-mono tracking-widest text-white py-1">
+                    {dispatchedOtp}
+                  </div>
+                  <p className="text-[10px] text-zinc-400">
+                    Enter this unique number below to verify your email address
+                  </p>
+                </div>
+              )}
 
+              {/* 6-Digit Code Input */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5 font-mono text-center">
+                  Enter 6-Digit Code
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  required
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="••••••"
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-2xl py-3 text-center text-2xl font-black font-mono tracking-[0.5em] text-white placeholder-zinc-600 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
+                  autoFocus
+                />
+              </div>
+
+              {/* Verify Button */}
+              <button
+                type="submit"
+                disabled={isLoading || otpCode.length !== 6}
+                className="w-full py-3.5 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <span>Verifying Code...</span>
+                ) : (
+                  <>
+                    <span>Verify & Create Account</span>
+                    <Check className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+
+              {/* Resend Section */}
+              <div className="text-center pt-1">
+                {resendTimer > 0 ? (
+                  <span className="text-xs text-zinc-500 font-mono">
+                    Resend new code in <span className="text-amber-400 font-bold">{resendTimer}s</span>
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResendCode}
+                    disabled={isLoading}
+                    className="text-xs text-amber-400 hover:text-amber-300 font-mono underline inline-flex items-center gap-1 transition"
+                  >
+                    <RotateCw className="w-3 h-3" />
+                    <span>Resend 6-Digit Code</span>
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+
+          {/* ============================================================== */}
+          {/* 2. FORGOT PASSWORD MODE (mode === 'forgot')                    */}
+          {/* ============================================================== */}
+          {mode === 'forgot' && (
+            <form onSubmit={handleForgotSubmit} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
+                  Your Registered Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your.email@example.com"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg mt-2"
+              >
+                {isLoading ? (
+                  <span>Sending Reset Code...</span>
+                ) : (
+                  <>
+                    <span>Send 6-Digit Reset Code</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* ============================================================== */}
+          {/* 3. RESET PASSWORD CONFIRM MODE (mode === 'reset_confirm')      */}
+          {/* ============================================================== */}
+          {mode === 'reset_confirm' && (
+            <form onSubmit={handleResetConfirm} className="space-y-3">
+              
+              {dispatchedOtp && (
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center">
+                  <span className="text-[10px] text-zinc-400 block font-mono">Reset Code for {email}:</span>
+                  <span className="text-xl font-black font-mono tracking-widest text-amber-400 block mt-0.5">
+                    {dispatchedOtp}
+                  </span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
+                  Enter 6-Digit Reset Code
+                </label>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="6-digit code"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white font-mono tracking-widest placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
+                  New Password (min 6 characters)
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="password"
+                    required
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg mt-2"
+              >
+                {isLoading ? (
+                  <span>Updating Password...</span>
+                ) : (
+                  <>
+                    <span>Update Password & Sign In</span>
+                    <Check className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* ============================================================== */}
+          {/* 4. PRIMARY SIGN IN / SIGN UP FORMS                            */}
+          {/* ============================================================== */}
+          {(mode === 'signin' || mode === 'signup') && (
+            <form onSubmit={handlePrimarySubmit} className="space-y-3">
+              
+              {/* Full Name (Sign Up only) */}
+              {mode === 'signup' && (
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
-                    Email Address
+                    Full Name
                   </label>
                   <div className="relative">
-                    <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                    <User className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
                     <input
-                      type="email"
+                      type="text"
                       required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="your.email@example.com"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Santhosh"
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 </div>
+              )}
 
+              {/* Email Address */}
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your.email@gmail.com"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 font-mono">
+                    Password
+                  </label>
+                  {mode === 'signin' && (
+                    <button
+                      type="button"
+                      onClick={() => { setMode('forgot'); setError(''); }}
+                      className="text-[10px] text-amber-400 hover:underline font-mono"
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+
+              {/* Mobile Phone (Sign Up only) */}
+              {mode === 'signup' && (
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 font-mono">
-                      Password
+                      Mobile Phone
                     </label>
-                    {mode === 'signin' && (
-                      <button
-                        type="button"
-                        onClick={() => { setMode('forgot'); setError(''); setResetSuccess(false); }}
-                        className="text-[10px] text-amber-400 hover:underline font-mono"
-                      >
-                        Forgot Password?
-                      </button>
-                    )}
+                    <span className="text-[10px] text-zinc-500 font-mono">Optional</span>
                   </div>
                   <div className="relative">
-                    <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
+                    <Phone className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
                     <input
-                      type="password"
-                      required
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••••"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      placeholder="10-digit mobile number"
                       className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
                     />
                   </div>
                 </div>
+              )}
 
-                {mode === 'signup' && (
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 font-mono">
-                        Mobile Phone
-                      </label>
-                      <span className="text-[10px] text-amber-400 font-mono">Optional • No SMS OTP required</span>
-                    </div>
-                    <div className="relative">
-                      <Phone className="w-4 h-4 text-zinc-500 absolute left-3 top-3 pointer-events-none" />
-                      <input
-                        type="tel"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        placeholder="10-digit mobile number"
-                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400"
-                      />
-                    </div>
-                  </div>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full py-3.5 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg mt-2"
+              >
+                {isLoading ? (
+                  <span>Processing...</span>
+                ) : mode === 'signin' ? (
+                  <>
+                    <span>Sign In with Email</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    <span>Send Verification Code</span>
+                    <ShieldCheck className="w-4 h-4" />
+                  </>
                 )}
-
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full py-3 px-4 bg-white hover:bg-zinc-200 text-black font-black uppercase text-xs tracking-wider rounded-xl transition flex items-center justify-center gap-2 active:scale-98 shadow-lg mt-2"
-                >
-                  {isLoading ? (
-                    <span>Processing...</span>
-                  ) : mode === 'signin' ? (
-                    <>
-                      <span>Sign In</span>
-                      <ArrowRight className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      <span>Create Free Account</span>
-                      <Check className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              </form>
-            </>
+              </button>
+            </form>
           )}
 
-          {/* Free Tier Guarantee Badge */}
+          {/* Security Guarantee Badge */}
           <div className="pt-2 flex items-center justify-center gap-1.5 text-[10px] text-zinc-500 font-mono">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>100% Free Tier Auth • Zero SMS Charges</span>
+            <span>Secure 6-Digit Email Verification • Zero Demo Bypasses</span>
           </div>
 
         </div>
