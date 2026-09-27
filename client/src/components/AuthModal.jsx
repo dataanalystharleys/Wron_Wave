@@ -348,21 +348,26 @@ export default function AuthModal() {
                 </span>
               </div>
 
-              {/* Code Preview Security Badge */}
-              {dispatchedOtp && (
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-amber-400 font-mono uppercase">
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Your 6-Digit Verification Code</span>
-                  </div>
-                  <div id="dispatched-otp-badge" className="text-2xl font-black font-mono tracking-widest text-white py-1">
-                    {dispatchedOtp}
-                  </div>
-                  <p className="text-[10px] text-zinc-400">
-                    Enter this unique number below to verify your email address
+              {/* Check Inbox Instructions (Never displays code on screen) */}
+              <div className="p-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl text-center space-y-2">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-white">
+                    Check Your Email Inbox
+                  </h4>
+                  <p className="text-xs text-zinc-300 mt-1">
+                    We sent a unique 6-digit verification code to:
+                  </p>
+                  <p className="text-xs font-mono font-bold text-amber-400 mt-0.5 truncate">
+                    {email}
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-2 leading-relaxed">
+                    Open your email inbox (and spam/promotions folder), copy the 6-digit code, and enter it below.
                   </p>
                 </div>
-              )}
+              </div>
 
               {/* 6-Digit Code Input */}
               <div>
@@ -466,14 +471,10 @@ export default function AuthModal() {
           {mode === 'reset_confirm' && (
             <form onSubmit={handleResetConfirm} className="space-y-3">
               
-              {dispatchedOtp && (
-                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-center">
-                  <span className="text-[10px] text-zinc-400 block font-mono">Reset Code for {email}:</span>
-                  <span className="text-xl font-black font-mono tracking-widest text-amber-400 block mt-0.5">
-                    {dispatchedOtp}
-                  </span>
-                </div>
-              )}
+              <div className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl text-center space-y-1">
+                <span className="text-[10px] text-zinc-400 block font-mono">Check your inbox for the reset code sent to:</span>
+                <span className="text-xs font-bold text-amber-400 font-mono block truncate">{email}</span>
+              </div>
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1 font-mono">
